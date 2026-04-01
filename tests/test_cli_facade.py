@@ -176,6 +176,70 @@ class TestWorkflowGateMessages:
         assert len(payload["process_steps"]) == 3
         assert "confirm" in payload["process_steps"][1]
 
+    def test_push_reuses_confirmed_file(self, tmp_path, monkeypatch, capsys):
+        export_file = tmp_path / "confirmed.jsonl"
+        export_file.write_text('{"project":"p","model":"m","stats":{"input_tokens":1,"output_tokens":2}}\n')
+
+        saved = {}
+        pushed = {}
+
+        monkeypatch.setattr(
+            "dataclaw.cli.load_config",
+            lambda: {
+                "stage": "confirmed",
+                "repo": "alice/repo",
+                "last_confirm": {"file": str(export_file)},
+                "review_attestations": {
+                    "asked_full_name": "User declined to share full name; skipped exact-name scan.",
+                    "asked_sensitive_entities": "I asked about company, client, internal names, and URLs; none required extra redaction.",
+                    "manual_scan_done": "I performed a manual scan and reviewed 20 sessions across beginning, middle, and end.",
+                },
+                "review_verification": {
+                    "full_name": None,
+                    "full_name_scan_skipped": True,
+                    "manual_scan_sessions": 20,
+                },
+            },
+        )
+        monkeypatch.setattr("dataclaw.cli.save_config", lambda cfg: saved.update(cfg))
+        monkeypatch.setattr(
+            "dataclaw.cli.discover_projects",
+            lambda: (_ for _ in ()).throw(AssertionError("should not rediscover projects")),
+        )
+        monkeypatch.setattr(
+            "dataclaw.cli._has_session_sources",
+            lambda _src: (_ for _ in ()).throw(AssertionError("should not probe sources")),
+        )
+        monkeypatch.setattr(
+            "dataclaw.cli.export_to_jsonl",
+            lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("should not regenerate jsonl")),
+        )
+
+        def fake_push(path, repo_id, meta):
+            pushed["path"] = path
+            pushed["repo_id"] = repo_id
+            pushed["meta"] = meta
+
+        monkeypatch.setattr("dataclaw.cli.push_to_huggingface", fake_push)
+        monkeypatch.setattr(
+            "sys.argv",
+            [
+                "dataclaw",
+                "export",
+                "--publish-attestation",
+                "User explicitly approved publishing to Hugging Face.",
+            ],
+        )
+
+        main()
+
+        assert pushed["path"] == export_file
+        assert pushed["repo_id"] == "alice/repo"
+        assert pushed["meta"]["sessions"] == 1
+        assert saved["stage"] == "done"
+        output = capsys.readouterr().out
+        assert "Reusing confirmed export file" in output
+
     def test_export_requires_project_confirmation_with_full_flow(self, monkeypatch, capsys):
         monkeypatch.setattr("dataclaw.cli._has_session_sources", lambda _src: True)
         monkeypatch.setattr(

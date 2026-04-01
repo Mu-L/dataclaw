@@ -7,7 +7,7 @@ from pathlib import Path
 
 from ._cli import commands, exporting, review
 from ._cli.common import DEFAULT_SOURCE, _has_session_sources
-from ._cli.exporting import push_to_huggingface, update_skill
+from ._cli.exporting import push_to_huggingface, summarize_export_jsonl, update_skill
 from .anonymizer import Anonymizer
 from .config import CONFIG_FILE, load_config, save_config
 from .parser import discover_projects, parse_project_sessions
@@ -111,6 +111,7 @@ def _run_export(args) -> None:
         discover_projects_fn=discover_projects,
         has_session_sources_fn=_has_session_sources,
         export_to_jsonl_fn=export_to_jsonl,
+        summarize_jsonl_fn=summarize_export_jsonl,
         push_to_huggingface_fn=push_to_huggingface,
     )
 

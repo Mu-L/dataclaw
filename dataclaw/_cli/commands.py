@@ -211,32 +211,14 @@ def run_export(
     discover_projects_fn,
     has_session_sources_fn,
     export_to_jsonl_fn,
+    summarize_jsonl_fn,
     push_to_huggingface_fn,
 ) -> None:
     config = load_config_fn()
     source_choice, source_explicit = _resolve_source_choice(args.source, config)
     source_filter = _normalize_source_filter(source_choice)
 
-    if not source_explicit:
-        print(
-            json.dumps(
-                {
-                    "error": "Source scope is not confirmed yet.",
-                    "hint": f"Explicitly choose one source scope before exporting: {_source_scope_literals()}.",
-                    "required_action": (
-                        f"Ask the user whether to export {_all_provider_labels()} or all. "
-                        f"Then run `dataclaw config --source {_source_scope_placeholder()}` "
-                        f"or pass `--source {_source_scope_placeholder()}` on the export command."
-                    ),
-                    "allowed_sources": sorted(EXPLICIT_SOURCE_CHOICES),
-                    "blocked_on_step": "Step 2/6",
-                    "process_steps": _setup_to_publish_steps(),
-                    "next_command": "dataclaw config --source all",
-                },
-                indent=2,
-            )
-        )
-        sys.exit(1)
+    confirmed_file: Path | None = None
 
     if not args.no_push:
         if args.attest_user_approved_publish and not args.publish_attestation:
@@ -329,9 +311,109 @@ def run_export(
         config["publish_attestation"] = publish_attestation
         save_config_fn(config)
 
+        last_confirm = config.get("last_confirm", {})
+        confirmed_file_raw = last_confirm.get("file")
+        if not isinstance(confirmed_file_raw, str) or not confirmed_file_raw:
+            print(
+                json.dumps(
+                    {
+                        "error": "No confirmed export file is recorded.",
+                        "hint": "Run `dataclaw confirm --file path/to/export.jsonl` on the reviewed local export, then push again.",
+                        "blocked_on_step": "Step 2/3",
+                        "process_steps": EXPORT_REVIEW_PUBLISH_STEPS,
+                        "next_command": "dataclaw confirm",
+                    },
+                    indent=2,
+                )
+            )
+            sys.exit(1)
+
+        confirmed_file = Path(confirmed_file_raw)
+        if not confirmed_file.exists():
+            print(
+                json.dumps(
+                    {
+                        "error": f"Confirmed export file does not exist: {confirmed_file}",
+                        "hint": "Re-export locally with `dataclaw export --no-push`, review it, rerun `dataclaw confirm`, then push again.",
+                        "blocked_on_step": "Step 1/3",
+                        "process_steps": EXPORT_REVIEW_PUBLISH_STEPS,
+                        "next_command": "dataclaw export --no-push --output dataclaw_export.jsonl",
+                    },
+                    indent=2,
+                )
+            )
+            sys.exit(1)
+
+    if confirmed_file is None and not source_explicit:
+        print(
+            json.dumps(
+                {
+                    "error": "Source scope is not confirmed yet.",
+                    "hint": f"Explicitly choose one source scope before exporting: {_source_scope_literals()}.",
+                    "required_action": (
+                        f"Ask the user whether to export {_all_provider_labels()} or all. "
+                        f"Then run `dataclaw config --source {_source_scope_placeholder()}` "
+                        f"or pass `--source {_source_scope_placeholder()}` on the export command."
+                    ),
+                    "allowed_sources": sorted(EXPLICIT_SOURCE_CHOICES),
+                    "blocked_on_step": "Step 2/6",
+                    "process_steps": _setup_to_publish_steps(),
+                    "next_command": "dataclaw config --source all",
+                },
+                indent=2,
+            )
+        )
+        sys.exit(1)
+
     print("=" * 50)
     print("  DataClaw - Coding Agent Log Exporter")
     print("=" * 50)
+
+    repo_id = args.repo or config.get("repo")
+    if not repo_id and not args.no_push:
+        hf_user = get_hf_username()
+        if hf_user:
+            repo_id = default_repo_name(hf_user)
+            print(f"\nAuto-detected HF repo: {repo_id}")
+            config["repo"] = repo_id
+            save_config_fn(config)
+
+    if confirmed_file is not None:
+        file_size = confirmed_file.stat().st_size
+        print(f"\nReusing confirmed export file: {confirmed_file}")
+        meta = summarize_jsonl_fn(confirmed_file)
+        print(f"Publishing {meta['sessions']} confirmed sessions ({_format_size(file_size)})")
+
+        if not repo_id:
+            print("\nNo HF repo. Log in first: hf auth login --token YOUR_TOKEN")
+            print("Then re-run dataclaw and it will auto-detect your username.")
+            print(f"Or set manually: dataclaw config --repo {default_repo_name('username')}")
+            print(f"\nLocal file: {confirmed_file}")
+            return
+
+        push_to_huggingface_fn(confirmed_file, repo_id, meta)
+
+        config["stage"] = "done"
+        save_config_fn(config)
+
+        print("\n---DATACLAW_JSON---")
+        print(
+            json.dumps(
+                {
+                    "stage": "done",
+                    "stage_number": 4,
+                    "total_stages": 4,
+                    "dataset_url": f"https://huggingface.co/datasets/{repo_id}",
+                    "next_steps": [
+                        "Done! Dataset is live. To update later: dataclaw export",
+                        "To reconfigure: dataclaw prep then dataclaw config",
+                    ],
+                    "next_command": None,
+                },
+                indent=2,
+            )
+        )
+        return
 
     if not has_session_sources_fn(source_filter):
         provider = PROVIDERS.get(source_filter)
@@ -384,15 +466,6 @@ def run_export(
     total_size = sum(project["total_size_bytes"] for project in projects)
     print(f"\nFound {total_sessions} sessions across {len(projects)} projects ({_format_size(total_size)} raw)")
     print(f"Source scope: {source_choice}")
-
-    repo_id = args.repo or config.get("repo")
-    if not repo_id and not args.no_push:
-        hf_user = get_hf_username()
-        if hf_user:
-            repo_id = default_repo_name(hf_user)
-            print(f"\nAuto-detected HF repo: {repo_id}")
-            config["repo"] = repo_id
-            save_config_fn(config)
 
     excluded = set(config.get("excluded_projects", []))
     if args.all_projects:

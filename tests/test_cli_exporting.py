@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from dataclaw._cli.exporting import _build_dataset_card, export_to_jsonl, push_to_huggingface
+from dataclaw._cli.exporting import _build_dataset_card, export_to_jsonl, push_to_huggingface, summarize_export_jsonl
 
 
 class TestBuildDatasetCard:
@@ -260,3 +260,26 @@ class TestPushToHuggingface:
         with patch.dict("sys.modules", {"huggingface_hub": mock_hf_module}):
             with pytest.raises(SystemExit):
                 push_to_huggingface(jsonl_path, "user/repo", {})
+
+
+class TestSummarizeExportJsonl:
+    def test_summarizes_existing_export_file(self, tmp_path):
+        jsonl_path = tmp_path / "data.jsonl"
+        jsonl_path.write_text(
+            "\n".join(
+                [
+                    '{"project":"p1","model":"m1","stats":{"input_tokens":10,"output_tokens":3}}',
+                    '{"project":"p2","model":"m1","stats":{"input_tokens":7,"output_tokens":1}}',
+                    '{"project":"p1","model":"m2","stats":{"input_tokens":5,"output_tokens":2}}',
+                ]
+            )
+            + "\n"
+        )
+
+        meta = summarize_export_jsonl(jsonl_path)
+
+        assert meta["sessions"] == 3
+        assert meta["models"] == {"m1": 2, "m2": 1}
+        assert meta["projects"] == ["p1", "p2"]
+        assert meta["total_input_tokens"] == 22
+        assert meta["total_output_tokens"] == 6

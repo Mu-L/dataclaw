@@ -100,6 +100,46 @@ def export_to_jsonl(
     }
 
 
+def summarize_export_jsonl(jsonl_path: Path) -> dict:
+    models: dict[str, int] = {}
+    project_names: list[str] = []
+    seen_projects: set[str] = set()
+    total = 0
+    total_input_tokens = 0
+    total_output_tokens = 0
+
+    with open(jsonl_path) as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            row = json.loads(line)
+            total += 1
+
+            model = row.get("model")
+            if isinstance(model, str) and model.strip():
+                models[model] = models.get(model, 0) + 1
+
+            project = row.get("project")
+            if isinstance(project, str) and project not in seen_projects:
+                seen_projects.add(project)
+                project_names.append(project)
+
+            stats = row.get("stats", {})
+            if isinstance(stats, dict):
+                total_input_tokens += stats.get("input_tokens", 0)
+                total_output_tokens += stats.get("output_tokens", 0)
+
+    return {
+        "sessions": total,
+        "models": models,
+        "projects": project_names,
+        "total_input_tokens": total_input_tokens,
+        "total_output_tokens": total_output_tokens,
+        "exported_at": datetime.now(tz=timezone.utc).isoformat(),
+    }
+
+
 def push_to_huggingface(jsonl_path: Path, repo_id: str, meta: dict) -> None:
     try:
         from huggingface_hub import HfApi
