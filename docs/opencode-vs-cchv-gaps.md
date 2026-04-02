@@ -15,15 +15,14 @@ CCHV preserves substantially more OpenCode part-level structure than DataClaw.
 
 The biggest current DataClaw gaps are:
 
-1. It drops OpenCode `file` parts, including real image `data:` URIs stored in the database.
-2. It drops `patch`, `step-start`, `step-finish`, and `compaction` parts.
-3. It loses per-message usage and cost derived from `step-finish` parts.
-4. It loses message threading via `parentID`.
-5. It flattens OpenCode content into a smaller normalized schema and drops part-level structure that CCHV keeps.
+1. It drops `patch`, `step-start`, `step-finish`, and `compaction` parts.
+2. It loses per-message usage and cost derived from `step-finish` parts.
+3. It loses message threading via `parentID`.
+4. It flattens OpenCode content into a smaller normalized schema and drops part-level structure that CCHV keeps.
 
 ## Detailed Findings
 
-### 1. CCHV keeps OpenCode `file` parts; DataClaw drops them
+### Important Counterpoint: DataClaw now preserves OpenCode user `file` parts
 
 CCHV processes OpenCode `part.type == "file"` and preserves:
 
@@ -35,16 +34,20 @@ References:
 
 - CCHV OpenCode part processing: `~/claude-code-history-viewer/src-tauri/src/providers/opencode.rs:1204-1240`
 
-DataClaw's OpenCode parser ignores `file` parts entirely.
+DataClaw now preserves OpenCode user `file` parts via `messages[].content_parts`, including:
+
+- image `data:` URIs as image blocks with verbatim base64 payloads
+- non-image `file://...` references as document URL blocks
 
 References:
 
-- DataClaw user extraction only keeps `text` parts: `~/dataclaw/dataclaw/parsers/opencode.py:210-223`
-- DataClaw assistant extraction only handles `text`, `reasoning`, and `tool`: `~/dataclaw/dataclaw/parsers/opencode.py:226-277`
+- DataClaw OpenCode file-source parsing: `~/dataclaw/dataclaw/parsers/opencode.py:211-245`
+- DataClaw OpenCode user message extraction: `~/dataclaw/dataclaw/parsers/opencode.py:248-272`
 
 Practical consequence:
 
-- DataClaw drops OpenCode file references and image payloads that CCHV keeps.
+- This is no longer a primary OpenCode gap in DataClaw for user file/image parts.
+- DataClaw now preserves the real OpenCode base64 image payloads found on this machine.
 
 Observed in real OpenCode data on this machine:
 
@@ -62,7 +65,7 @@ Example real image part from the database:
   - `mime: "image/png"`
   - `url: "data:image/png;base64,..."`
 
-### 2. CCHV keeps `patch`, `step-start`, `step-finish`, and `compaction` parts; DataClaw drops them
+### 1. CCHV keeps `patch`, `step-start`, `step-finish`, and `compaction` parts; DataClaw drops them
 
 CCHV explicitly handles these OpenCode part types:
 
@@ -108,7 +111,7 @@ Example real parts from the database:
   - message: `msg_c51049d72001i65GspUCMGRSZB`
   - part payload: `{"type":"compaction","auto":true}`
 
-### 3. CCHV keeps per-message token usage and cost; DataClaw only keeps session totals
+### 2. CCHV keeps per-message token usage and cost; DataClaw only keeps session totals
 
 CCHV derives OpenCode per-message usage and cost from both:
 
@@ -146,7 +149,7 @@ Example `step-finish` payload from the database:
 - contains values like:
   - `{"type":"step-finish","reason":"tool-calls","cost":0,"tokens":{"input":11294,"output":83,"cache":{"read":0,"write":0}}}`
 
-### 4. CCHV keeps message threading via `parentID`; DataClaw drops it
+### 3. CCHV keeps message threading via `parentID`; DataClaw drops it
 
 CCHV maps OpenCode `parentID` to `parent_uuid` in the loaded message model.
 
@@ -170,7 +173,7 @@ Observed in real OpenCode data on this machine:
 - querying `~/.local/share/opencode/opencode.db` showed that many OpenCode messages include `parentID`
 - at inspection time, `9697` messages had a non-empty `parentID`
 
-### 5. CCHV keeps a richer OpenCode content array; DataClaw flattens it
+### 4. CCHV keeps a richer OpenCode content array; DataClaw flattens it
 
 CCHV turns OpenCode parts into a structured content array with items like:
 
@@ -202,7 +205,7 @@ Practical consequence:
 
 - DataClaw loses OpenCode part-level fidelity beyond the normalized text/thinking/tool schema.
 
-### 6. Potential additional gap: CCHV has a JSON-storage fallback path; DataClaw only reads SQLite
+### 5. Potential additional gap: CCHV has a JSON-storage fallback path; DataClaw only reads SQLite
 
 CCHV loads OpenCode messages from SQLite first, then falls back to JSON storage files under `storage/` when needed.
 
@@ -249,10 +252,9 @@ The most important real payload classes for the comparison were:
 
 Compared with CCHV, DataClaw currently loses substantial OpenCode fidelity around:
 
-- image/file parts
 - patch / step / compaction parts
 - per-message usage and cost
 - parent-child message threading
 - part-level content structure generally
 
-The largest practical gap on this machine is that OpenCode stores real base64 image payloads in the database, CCHV preserves them, and DataClaw currently drops them.
+DataClaw now preserves OpenCode user file/image parts, including real base64 image payloads. The largest remaining practical OpenCode gaps on this machine are patch / step / compaction parts and per-message usage / cost.

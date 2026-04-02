@@ -16,7 +16,7 @@ CCHV retains substantially more Claude-log structure than DataClaw.
 The biggest current DataClaw gaps are:
 
 1. It flattens the raw message graph into a simplified conversation schema.
-2. It reduces tool results to plain text plus a success/error flag.
+2. It preserves much more Claude tool-result structure than before, but still does not keep the full raw message/tool object model that CCHV exposes.
 3. It drops Claude `summary` entries and rename-derived session metadata.
 4. It drops per-message metadata such as `uuid`, `parentUuid`, `stop_reason`, and raw `usage`.
 5. It merges all Claude subagent files in one session directory into a single synthetic `:subagents` export entry, while CCHV keeps per-file session granularity.
@@ -56,7 +56,7 @@ Practical consequence:
 
 - DataClaw loses the original message DAG / parent-child chain and raw entry identity.
 
-### 2. CCHV keeps raw `toolUse` / `toolUseResult`; DataClaw flattens them heavily
+### 2. CCHV keeps raw `toolUse` / `toolUseResult`; DataClaw now preserves more structure but still normalizes them
 
 CCHV stores raw Claude tool structures directly:
 
@@ -68,20 +68,23 @@ References:
 - CCHV raw tool fields: `~/claude-code-history-viewer/src-tauri/src/models/message.rs:40-67`
 - CCHV exported tool fields: `~/claude-code-history-viewer/src-tauri/src/models/message.rs:108-143`
 
-DataClaw instead:
+DataClaw now:
 
 - extracts assistant `tool_use` blocks
 - parses tool input into anonymized structured fields
-- converts tool results into only `output.text` and `status`
+- preserves normalized result text in `output.text`
+- preserves extra structured result data in `output.raw`
+- avoids duplicate edit/result payloads where possible
 
 References:
 
-- DataClaw tool-result map flattening: `~/dataclaw/dataclaw/parsers/claude.py:83-107`
-- DataClaw assistant tool export shape: `~/dataclaw/dataclaw/parsers/claude.py:279-328`
+- DataClaw tool-result extraction and `output.raw` preservation: `~/dataclaw/dataclaw/parsers/claude.py:86-245`
+- DataClaw assistant tool export shape: `~/dataclaw/dataclaw/parsers/claude.py:373-422`
 
 Practical consequence:
 
-- DataClaw drops structured tool-result details such as separate `stdout`/`stderr`, edit payloads, file objects, image results, and other nested result metadata.
+- DataClaw now keeps many structured tool-result details such as `stderr`, file objects, image payloads, and extra nested result metadata.
+- It still does not preserve the full raw Claude message/tool object model that CCHV exposes, and it intentionally drops some redundant edit-result fields (`oldString`, `newString`, `structuredPatch`) plus duplicate `create` file content.
 
 ### 3. CCHV keeps per-message metadata; DataClaw mostly aggregates or drops it
 
@@ -229,7 +232,7 @@ If the goal is a training/export dataset with simple, normalized conversation ro
 If the goal is Claude-log fidelity, CCHV currently retains more of the original Claude structure than DataClaw, especially around:
 
 - raw message identity / threading
-- raw tool payloads and results
+- raw message/tool object fidelity
 - per-message metadata
 - summaries / rename metadata
 - per-file subagent granularity

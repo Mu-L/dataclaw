@@ -33,17 +33,20 @@ References:
 - CCHV message loading loop: `~/claude-code-history-viewer/src-tauri/src/providers/codex.rs:267-393`
 - CCHV message conversion for `response_item.type == "message"`: `~/claude-code-history-viewer/src-tauri/src/providers/codex.rs:603-620`
 
-DataClaw's Codex parser only handles these `response_item` variants:
+DataClaw's Codex parser mainly handles these `response_item` variants:
 
 - `function_call`
 - `custom_tool_call`
 - `reasoning`
 
-It does not ingest `response_item.type == "message"` at all.
+It also now extracts user `input_image` parts from `response_item.type == "message"` and exports them via `messages[].content_parts`.
+
+It still does not ingest most other `response_item.type == "message"` text content.
 
 References:
 
-- DataClaw `handle_response_item(...)`: `~/dataclaw/dataclaw/parsers/codex.py:288-330`
+- DataClaw `handle_response_item(...)`: `~/dataclaw/dataclaw/parsers/codex.py:403-452`
+- DataClaw Codex user image extraction: `~/dataclaw/dataclaw/parsers/codex.py:293-399`
 
 Practical consequence:
 
@@ -62,6 +65,25 @@ Example real file with dropped developer and wrapper user messages:
 Important nuance:
 
 - Much of the assistant/user conversation text is duplicated by `event_msg.agent_message` and `event_msg.user_message`, so the biggest practical loss is the extra wrapper/context material rather than ordinary user/assistant chat text.
+
+### Important Counterpoint: DataClaw now preserves real Codex image input on this machine
+
+This is an important implemented improvement relative to the earlier state of the parser.
+
+DataClaw now preserves Codex user image input as `messages[].content_parts` when it appears in:
+
+- `response_item.payload.content[].type == "input_image"`
+- or `event_msg.user_message.local_images` as a local-file fallback
+
+References:
+
+- DataClaw Codex image extraction: `~/dataclaw/dataclaw/parsers/codex.py:293-399`
+
+Observed in real Codex data on this machine:
+
+- `~/.codex/sessions/2026/04/02/rollout-2026-04-02T08-26-37-019d4b95-bc24-7992-af85-e47738953690.jsonl:6-7`
+
+So user image input is no longer a current Codex gap in DataClaw.
 
 ### 2. CCHV keeps Codex progress/system events; DataClaw drops them
 

@@ -17,10 +17,8 @@ The biggest current DataClaw gaps are:
 
 1. It drops Gemini `info` / `warning` / `error` messages.
 2. It drops `resultDisplay` tool UI output, including file-diff previews and tool-status strings.
-3. It drops non-text user content parts such as `inlineData` images/documents.
-4. It drops part-level `functionResponse` blocks embedded in message content.
-5. It only keeps session-level token totals, while CCHV keeps per-message Gemini token usage.
-6. It does not preserve top-level Gemini session metadata such as `summary` and `kind`.
+3. It only keeps session-level token totals, while CCHV keeps per-message Gemini token usage.
+4. It does not preserve top-level Gemini session metadata such as `summary` and `kind`.
 
 Important counterpoint:
 
@@ -104,7 +102,7 @@ Example real file with file-diff previews:
 
 - `~/.gemini/tmp/comfyui-featherops/chats/session-2026-03-28T01-43-f9f3aa2a.json:305-306,350-351,395-396,440-441`
 
-### 3. CCHV keeps non-text Gemini content parts; DataClaw drops them in user messages
+### Important Counterpoint: DataClaw now preserves non-text Gemini user content parts
 
 CCHV converts Gemini content parts such as:
 
@@ -120,15 +118,24 @@ References:
 
 - CCHV content conversion helpers: `~/claude-code-history-viewer/src-tauri/src/providers/gemini.rs:660-867`
 
-DataClaw's Gemini parser, for `user` messages, only extracts parts containing `text` and drops the rest.
+DataClaw now preserves Gemini user content parts via `messages[].content_parts`, including:
+
+- `inlineData` image/document parts
+- `fileData` URL-backed document parts
+- `functionCall`
+- `functionResponse`
+
+It keeps the canonical joined text in `messages[].content` and stores the structured non-text parts separately.
 
 References:
 
-- DataClaw user-message extraction: `~/dataclaw/dataclaw/parsers/gemini.py:315-323`
+- DataClaw Gemini user content parsing: `~/dataclaw/dataclaw/parsers/gemini.py:324-430`
+- DataClaw Gemini user message export: `~/dataclaw/dataclaw/parsers/gemini.py:463-474`
 
 Practical consequence:
 
-- DataClaw drops user attachments and other structured Gemini content parts that CCHV preserves.
+- This is no longer a primary Gemini gap in DataClaw.
+- DataClaw now preserves user attachments and structured function parts while still exporting large base64/blob payloads verbatim.
 
 Observed in real Gemini data on this machine:
 
@@ -137,31 +144,7 @@ Observed in real Gemini data on this machine:
 
 These include large base64 image payloads that CCHV maps to image/document blocks.
 
-### 4. CCHV keeps part-level `functionResponse` blocks; DataClaw drops them when embedded in content
-
-CCHV converts `functionResponse` parts in Gemini content into `tool_result` blocks.
-
-References:
-
-- CCHV `functionResponse` conversion in `convert_gemini_content_to_claude(...)`: `~/claude-code-history-viewer/src-tauri/src/providers/gemini.rs:691-709`
-- CCHV direct `functionResponse` part conversion: `~/claude-code-history-viewer/src-tauri/src/providers/gemini.rs:813-830`
-
-DataClaw does not preserve these when they appear inside a message `content` array, because its user-message parser keeps only text parts.
-
-References:
-
-- DataClaw user-message extraction: `~/dataclaw/dataclaw/parsers/gemini.py:315-323`
-
-Practical consequence:
-
-- DataClaw loses some Gemini tool-result structure that is encoded directly in content parts rather than only in `toolCalls[].result`.
-
-Observed in real Gemini data on this machine:
-
-- real `functionResponse` content parts exist, for example in:
-  `~/.gemini/tmp/rocm-systems/chats/session-2026-03-06T03-33-68bc726c.json:122,147,172,231`
-
-### 5. CCHV keeps per-message token usage; DataClaw only keeps session totals
+### 3. CCHV keeps per-message token usage; DataClaw only keeps session totals
 
 CCHV stores Gemini per-message token usage derived directly from each Gemini response record's `tokens` field.
 
@@ -180,7 +163,7 @@ Practical consequence:
 
 - DataClaw loses per-message Gemini usage, including cached-input attribution on individual assistant responses.
 
-### 6. CCHV keeps more Gemini session metadata than DataClaw exports
+### 4. CCHV keeps more Gemini session metadata than DataClaw exports
 
 CCHV extracts Gemini session metadata including:
 
@@ -270,11 +253,11 @@ Compared with CCHV, DataClaw currently loses more Gemini fidelity around:
 
 - `info` / `warning` / `error` messages
 - `resultDisplay` tool UI output
-- non-text content parts such as `inlineData`
-- part-level `functionResponse` blocks
 - per-message token usage
 - top-level session metadata like `summary` and `kind`
 
 But CCHV also has one notable Gemini omission that DataClaw does not:
 
 - CCHV skips Gemini `kind == "subagent"` sessions from its normal session views, while DataClaw exports them.
+
+And DataClaw now also preserves structured Gemini user content parts such as `inlineData`, `fileData`, `functionCall`, and `functionResponse`, so those are no longer primary Gemini gaps.
