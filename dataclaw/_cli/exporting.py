@@ -460,7 +460,7 @@ ds = load_dataset("{repo_id}", split="train")
 ## Export your own
 
 ```bash
-pip install dataclaw
+pip install -U dataclaw
 dataclaw
 ```
 """

@@ -17,8 +17,8 @@ Help me export my Claude Code, Codex, and other coding-agent conversation histor
 Install it, then walk me through the process.
 
 STEP 1 - INSTALL
-  pip install dataclaw
-  If that fails: git clone https://github.com/banodoco/dataclaw.git /tmp/dataclaw && pip install /tmp/dataclaw
+  pip install -U dataclaw
+  If that fails: git clone https://github.com/banodoco/dataclaw.git /tmp/dataclaw && pip install -U /tmp/dataclaw
   If that also fails, ask the user where the source is.
 
 STEP 2 - INSTALL SKILL
@@ -72,7 +72,7 @@ IMPORTANT: Always export with --no-push first and review for PII before publishi
 
 ```bash
 # STEP 1 - INSTALL
-pip install dataclaw
+pip install -U dataclaw
 hf auth login --token YOUR_TOKEN
 
 # STEP 3 - PREP
@@ -248,7 +248,7 @@ The auto-generated HF README includes:
 
 **Better scheme:** If you need to clean the data and want to propose a better scheme, feel free to open an issue.
 
-**New provider:** If you use a new coding agent, you can ask it to read this repo and export its data as a new provider. Take Claude Code and Codex parsers as examples because they are the most well maintained. When you finish, ask the following question:
+**New provider:** If you use a new coding agent, you can ask it to read this repo and export its data as a new provider. Take Claude Code and Codex parsers as examples because they are the most well maintained. When you finish, ask the following questions:
 - Did you follow the scheme above? Currently it's free to add custom fields in `messages[].content_parts` and `tool_uses[].output.raw`.
 - Did you export all data, especially:
   - tool call inputs and outputs

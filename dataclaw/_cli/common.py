@@ -34,7 +34,7 @@ CONFIRM_COMMAND_SKIP_FULL_NAME_EXAMPLE = (
 )
 
 EXPORT_REVIEW_PUBLISH_STEPS = [
-    "Step 1 - Install: pip install dataclaw",
+    "Step 1 - Install: pip install -U dataclaw",
     "Step 2 - Install skill (Claude Code only): dataclaw update-skill claude",
     "Step 3 - Prep: dataclaw prep",
     "Step 3A - Choose source scope: dataclaw config --source <source|all>",

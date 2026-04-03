@@ -94,4 +94,4 @@ dataclaw update-skill claude               # Install/update the dataclaw skill f
 
 ## Prerequisite
 
-`command -v dataclaw >/dev/null 2>&1 && echo "dataclaw: installed" || echo "NOT INSTALLED - run: pip install dataclaw"`
+`command -v dataclaw >/dev/null 2>&1 && echo "dataclaw: installed" || echo "NOT INSTALLED - run: pip install -U dataclaw"`
