@@ -119,7 +119,7 @@ class TestDiscoverCodexProjects:
         assert len(sessions) == 1
         assert sessions[0]["project"] == "codex:myrepo"
         assert sessions[0]["model"] == "gpt-5.3-codex"
-        assert sessions[0]["stats"]["input_tokens"] == 150
+        assert sessions[0]["stats"]["input_tokens"] == 120
         assert sessions[0]["stats"]["output_tokens"] == 40
         assert sessions[0]["messages"][0]["role"] == "user"
         assert sessions[0]["messages"][1]["role"] == "assistant"

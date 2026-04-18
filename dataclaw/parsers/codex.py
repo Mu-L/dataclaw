@@ -495,9 +495,8 @@ def handle_token_count(state: CodexParseState, payload: dict[str, Any]) -> None:
         total_usage = info.get("total_token_usage", {})
         if isinstance(total_usage, dict):
             input_tokens = safe_int(total_usage.get("input_tokens"))
-            cached_tokens = safe_int(total_usage.get("cached_input_tokens"))
             output_tokens = safe_int(total_usage.get("output_tokens"))
-            state.max_input_tokens = max(state.max_input_tokens, input_tokens + cached_tokens)
+            state.max_input_tokens = max(state.max_input_tokens, input_tokens)
             state.max_output_tokens = max(state.max_output_tokens, output_tokens)
 
 
