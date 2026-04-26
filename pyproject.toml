@@ -36,9 +36,13 @@ dataclaw = "dataclaw.cli:main"
 
 [project.optional-dependencies]
 dev = ["pre-commit", "pytest", "ruff"]
+build = ["pyinstaller>=6.10", "keyring>=25", "secretstorage>=3.3; sys_platform == 'linux'"]
 
 [tool.ruff]
 line-length = 120
+
+[tool.setuptools.packages.find]
+include = ["dataclaw*"]
 
 [tool.ruff.lint]
 extend-select = ["I"]

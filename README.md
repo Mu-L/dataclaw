@@ -8,6 +8,24 @@ Turn your Claude Code, Codex, and other coding-agent conversation history into s
 
 Every export is tagged **`dataclaw`** on Hugging Face. Together, they may someday form a growing [distributed dataset](https://huggingface.co/datasets?other=dataclaw) of real-world human-AI coding collaboration.
 
+## Install
+
+### Mac app
+
+Download the latest signed macOS installer from [GitHub Releases](https://github.com/banodoco/dataclaw/releases/latest).
+
+Choose the Apple Silicon `.dmg` for M-series Macs, or the Intel `.dmg` for older Intel Macs. Open the `.dmg`, drag `DataClaw.app` to Applications, then launch DataClaw from Applications or Spotlight.
+
+The Mac app bundles the DataClaw sidecar, so users do not need to install Python, PyInstaller, or the CLI separately. Releases are signed, notarized, and configured for in-app updates through GitHub Releases.
+
+### CLI only
+
+Use this if you want the terminal workflow or you are asking a coding agent to run DataClaw for you:
+
+```bash
+pip install -U dataclaw
+```
+
 ## Give this to your agent
 
 Paste this into Claude Code, Codex, or any coding agent:
