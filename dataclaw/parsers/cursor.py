@@ -7,7 +7,6 @@ from typing import Any
 from .. import _json as json
 from ..anonymizer import Anonymizer
 from ..export_tasks import ExportSessionTask
-from ..secrets import redact_text
 from .common import (
     build_prefixed_project_name,
     build_projects_from_index,
@@ -285,7 +284,6 @@ def parse_session(
 
     metadata: dict[str, Any] = {
         "session_id": composer_id,
-        "cwd": None,
         "git_branch": None,
         "model": None,
         "start_time": None,
@@ -303,14 +301,6 @@ def parse_session(
         if isinstance(timestamp, (int, float)):
             timestamp = normalize_timestamp(timestamp)
 
-        if metadata["cwd"] is None:
-            wuris = bubble.get("workspaceUris", [])
-            if wuris and isinstance(wuris, list) and wuris[0]:
-                uri = wuris[0]
-                if uri.startswith("file://"):
-                    uri = uri[7:]
-                metadata["cwd"] = anonymizer.path(uri)
-
         model_info = bubble.get("modelInfo")
         if isinstance(model_info, dict) and metadata["model"] is None:
             model_name = model_info.get("modelName")
@@ -323,11 +313,10 @@ def parse_session(
             text = (bubble.get("text") or "").strip()
             if not text:
                 continue
-            redacted, _ = redact_text(text)
             messages.append(
                 {
                     "role": "user",
-                    "content": anonymizer.text(redacted),
+                    "content": text,
                     "timestamp": timestamp,
                 }
             )
@@ -348,23 +337,16 @@ def parse_session(
                         if isinstance(inner, dict):
                             params_raw = inner
 
-                tool_input = parse_tool_input(
-                    tool_name,
-                    params_raw if isinstance(params_raw, dict) else {},
-                    anonymizer,
-                )
+                tool_input = parse_tool_input(params_raw if isinstance(params_raw, dict) else {})
 
                 result_raw = _try_parse_json(tfd.get("result"))
                 tool_output: dict[str, Any] = {}
                 if isinstance(result_raw, str) and result_raw.strip():
-                    redacted_out, _ = redact_text(result_raw)
-                    tool_output = {"text": anonymizer.text(redacted_out)}
+                    tool_output = {"text": result_raw}
                 elif isinstance(result_raw, dict):
-                    tool_output = {
-                        k: anonymizer.text(str(v)) if isinstance(v, str) else v for k, v in result_raw.items()
-                    }
+                    tool_output = {k: str(v) if isinstance(v, str) else v for k, v in result_raw.items()}
                 elif result_raw is not None:
-                    tool_output = {"text": anonymizer.text(str(result_raw))}
+                    tool_output = {"text": str(result_raw)}
 
                 status_val = tfd.get("status", "unknown")
                 if isinstance(status_val, dict):
@@ -389,12 +371,11 @@ def parse_session(
                 if include_thinking and isinstance(thinking, dict):
                     think_text = (thinking.get("text") or "").strip()
                     if think_text:
-                        msg["thinking"] = anonymizer.text(think_text)
+                        msg["thinking"] = think_text
 
                 text = (bubble.get("text") or "").strip()
                 if text:
-                    redacted, _ = redact_text(text)
-                    msg["content"] = anonymizer.text(redacted)
+                    msg["content"] = text
 
                 messages.append(msg)
                 stats["assistant_messages"] += 1
@@ -412,10 +393,9 @@ def parse_session(
 
                 msg = {"role": "assistant", "timestamp": timestamp}
                 if text:
-                    redacted, _ = redact_text(text)
-                    msg["content"] = anonymizer.text(redacted)
+                    msg["content"] = text
                 if think_text:
-                    msg["thinking"] = anonymizer.text(think_text)
+                    msg["thinking"] = think_text
 
                 messages.append(msg)
                 stats["assistant_messages"] += 1
@@ -429,4 +409,4 @@ def parse_session(
     if metadata["model"] is None:
         metadata["model"] = "cursor-unknown"
 
-    return make_session_result(metadata, messages, stats)
+    return make_session_result(metadata, messages, stats, anonymizer=anonymizer)
